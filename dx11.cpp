@@ -1,18 +1,69 @@
 #include "dx11.h"
 #include "atltypes.h"
-#include "vertexHeader.h"
 #include "ps_test.h"
 #include "vs_test.h"
+#include <DirectXMath.h>
+#include <minwindef.h>
 
+using namespace DirectX;
 
-D3D11_INPUT_ELEMENT_DESC g_VertexDesc[]{
-	{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
-	{"COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
+struct Vertex {
+	float pos[3];
+	float nor[3];
+};
+
+Vertex g_VertexList[]{
+		{ { -0.5f,  0.5f, -0.5f }, {  0.0f,  0.0f, -1.0f } },
+		{ {  0.5f,  0.5f, -0.5f }, {  0.0f,  0.0f, -1.0f } },
+		{ { -0.5f, -0.5f, -0.5f }, {  0.0f,  0.0f, -1.0f } },
+		{ {  0.5f, -0.5f, -0.5f }, {  0.0f,  0.0f, -1.0f } },
+
+		{ { -0.5f,  0.5f,  0.5f }, {  0.0f,  0.0f,  1.0f } },
+		{ { -0.5f, -0.5f,  0.5f }, {  0.0f,  0.0f,  1.0f } },
+		{ {  0.5f,  0.5f,  0.5f }, {  0.0f,  0.0f,  1.0f } },
+		{ {  0.5f, -0.5f,  0.5f }, {  0.0f,  0.0f,  1.0f } },
+
+		{ { -0.5f,  0.5f,  0.5f }, { -1.0f,  0.0f,  0.0f } },
+		{ { -0.5f,  0.5f, -0.5f }, { -1.0f,  0.0f,  0.0f } },
+		{ { -0.5f, -0.5f,  0.5f }, { -1.0f,  0.0f,  0.0f } },
+		{ { -0.5f, -0.5f, -0.5f }, { -1.0f,  0.0f,  0.0f } },
+
+		{ {  0.5f,  0.5f,  0.5f }, {  1.0f,  0.0f,  0.0f } },
+		{ {  0.5f, -0.5f,  0.5f }, {  1.0f,  0.0f,  0.0f } },
+		{ {  0.5f,  0.5f, -0.5f }, {  1.0f,  0.0f,  0.0f } },
+		{ {  0.5f, -0.5f, -0.5f }, {  1.0f,  0.0f,  0.0f } },
+
+		{ { -0.5f,  0.5f,  0.5f }, {  0.0f,  1.0f,  0.0f } },
+		{ {  0.5f,  0.5f,  0.5f }, {  0.0f,  1.0f,  0.0f } },
+		{ { -0.5f,  0.5f, -0.5f }, {  0.0f,  1.0f,  0.0f } },
+		{ {  0.5f,  0.5f, -0.5f }, {  0.0f,  1.0f,  0.0f } },
+
+		{ { -0.5f, -0.5f,  0.5f }, {  0.0f, -1.0f,  0.0f } },
+		{ { -0.5f, -0.5f, -0.5f }, {  0.0f, -1.0f,  0.0f } },
+		{ {  0.5f, -0.5f,  0.5f }, {  0.0f, -1.0f,  0.0f } },
+		{ {  0.5f, -0.5f, -0.5f }, {  0.0f, -1.0f,  0.0f } },
 };
 
 WORD g_IndexList[]{
-	0, 1, 2,
-	0, 3, 1,
+	 0,  1,  2,     3,  2,  1,
+	 4,  5,  6,     7,  6,  5,
+	 8,  9, 10,    11, 10,  9,
+	12, 13, 14,    15, 14, 13,
+	16, 17, 18,    19, 18, 17,
+	20, 21, 22,    23, 22, 21,
+};
+
+D3D11_INPUT_ELEMENT_DESC g_VertexDesc[]{
+	{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+	{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
+};
+
+struct ConstantBuffer {
+	XMFLOAT4X4 world;
+	XMFLOAT4X4 view;
+	XMFLOAT4X4 projection;
+	XMFLOAT4 light;
+	XMFLOAT4 attenuation;
 };
 
 
@@ -28,6 +79,7 @@ CD3D11::CD3D11() {
 	m_pVertexShader = NULL;
 	m_pPixelShader = NULL;
 	m_pIndexBuffer = NULL;
+	m_pConstantBuffer = NULL;
 }
 
 CD3D11::~CD3D11() {
@@ -86,21 +138,21 @@ HRESULT CD3D11::Create(HWND hwnd) {
 	dsDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
 	dsDesc.Texture2D.MipSlice = 0;
 
-	D3D11_BUFFER_DESC bufferDesc;
-	bufferDesc.ByteWidth = sizeof(Vertex) * 4;
-	bufferDesc.Usage = D3D11_USAGE_DEFAULT;
-	bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-	bufferDesc.CPUAccessFlags = 0;
-	bufferDesc.MiscFlags = 0;
-	bufferDesc.StructureByteStride = 0;
+	D3D11_BUFFER_DESC vbDesc;
+	vbDesc.ByteWidth = sizeof(Vertex) * 24;
+	vbDesc.Usage = D3D11_USAGE_DEFAULT;
+	vbDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	vbDesc.CPUAccessFlags = 0;
+	vbDesc.MiscFlags = 0;
+	vbDesc.StructureByteStride = 0;
 
-	D3D11_SUBRESOURCE_DATA subResourceData;
-	subResourceData.pSysMem = g_VetrexList;
-	subResourceData.SysMemPitch = 0;
-	subResourceData.SysMemSlicePitch = 0;
+	D3D11_SUBRESOURCE_DATA vrData;
+	vrData.pSysMem = g_VertexList;
+	vrData.SysMemPitch = 0;
+	vrData.SysMemSlicePitch = 0;
 
 	D3D11_BUFFER_DESC ibDesc;
-	ibDesc.ByteWidth = sizeof(WORD) * 6;
+	ibDesc.ByteWidth = sizeof(WORD) * 6 * 6;
 	ibDesc.Usage = D3D11_USAGE_DEFAULT;
 	ibDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
 	ibDesc.CPUAccessFlags = 0;
@@ -111,6 +163,14 @@ HRESULT CD3D11::Create(HWND hwnd) {
 	irData.pSysMem = g_IndexList;
 	irData.SysMemPitch = 0;
 	irData.SysMemSlicePitch = 0;
+
+	D3D11_BUFFER_DESC cbDesc;
+	cbDesc.ByteWidth = sizeof(ConstantBuffer);
+	cbDesc.Usage = D3D11_USAGE_DEFAULT;
+	cbDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	cbDesc.CPUAccessFlags = 0;
+	cbDesc.MiscFlags = 0;
+	cbDesc.StructureByteStride = 0;
 
 	hr = D3D11CreateDeviceAndSwapChain(
 		NULL,
@@ -147,7 +207,7 @@ HRESULT CD3D11::Create(HWND hwnd) {
 	if (FAILED(hr))
 		return hr;
 
-	hr = m_pDevice->CreateBuffer(&bufferDesc, &subResourceData, &m_pVertexBuffer);
+	hr = m_pDevice->CreateBuffer(&vbDesc, &vrData, &m_pVertexBuffer);
 	if (FAILED(hr))
 		return hr;
 
@@ -168,6 +228,33 @@ HRESULT CD3D11::Create(HWND hwnd) {
 	hr = m_pDevice->CreateBuffer(&ibDesc, &irData, &m_pIndexBuffer);
 	if (FAILED(hr))
 		return hr;
+
+	hr = m_pDevice->CreateBuffer(&cbDesc, NULL, &m_pConstantBuffer);
+	if (FAILED(hr))
+		return hr;
+
+	XMMATRIX worldMatrix = XMMatrixTranslation(0.0f, 0.0f, 0.0f);
+
+	XMVECTOR eye = XMVectorSet(2.0f, 2.0f, -2.0f, 0.0f);
+	XMVECTOR focus = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
+	XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+	XMVECTOR light = XMVector3Normalize(XMVectorSet(0.0f, 2.0f, -1.5f, 0.0f));
+	XMVECTOR attenuation = XMVectorSet(1.0f, 0.0f, 0.2f, 0.0f);
+	XMMATRIX viewMatrix = XMMatrixLookAtLH(eye, focus, up);
+
+	float fov = XMConvertToRadians(45.0f);
+	float aspect = m_Viewport.Width / m_Viewport.Height;
+	float nearZ = 0.1f;
+	float farZ = 100.0f;
+	XMMATRIX projMatrix = XMMatrixPerspectiveFovLH(fov, aspect, nearZ, farZ);
+
+	ConstantBuffer cb;
+	XMStoreFloat4x4(&cb.world, XMMatrixTranspose(worldMatrix));
+	XMStoreFloat4x4(&cb.view, XMMatrixTranspose(viewMatrix));
+	XMStoreFloat4x4(&cb.projection, XMMatrixTranspose(projMatrix));
+	XMStoreFloat4(&cb.light, light);
+	XMStoreFloat4(&cb.attenuation, attenuation);
+	m_pImmediateContext->UpdateSubresource(m_pConstantBuffer, 0, NULL, &cb, 0, 0);
 
 	return hr;
 
@@ -218,6 +305,10 @@ void CD3D11::Release() {
 		m_pPixelShader->Release();
 		m_pPixelShader = NULL;
 	}
+	if (NULL != m_pConstantBuffer) {
+		m_pConstantBuffer->Release();
+		m_pConstantBuffer = NULL;
+	}
 }
 
 void CD3D11::Render() {
@@ -231,6 +322,8 @@ void CD3D11::Render() {
 	if (NULL == m_pPixelShader) return;
 	if (NULL == m_pVertexBuffer) return;
 	if (NULL == m_pVertexShader) return;
+	if (NULL == m_pConstantBuffer) return;
+
 
 	float clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 
@@ -240,16 +333,17 @@ void CD3D11::Render() {
 	m_pImmediateContext->IASetVertexBuffers(0, 1, &m_pVertexBuffer, &strides, &offsets);
 	m_pImmediateContext->IASetIndexBuffer(m_pIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
 	m_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	m_pImmediateContext->VSSetConstantBuffers(0, 1, &m_pConstantBuffer);
 	m_pImmediateContext->VSSetShader(m_pVertexShader, NULL, 0);
 	m_pImmediateContext->RSSetViewports(1, &m_Viewport);
+	m_pImmediateContext->PSSetConstantBuffers(0, 1, &m_pConstantBuffer);
 	m_pImmediateContext->PSSetShader(m_pPixelShader, NULL, 0);
-
 	m_pImmediateContext->OMSetRenderTargets(1, &m_pRenderTargetView, m_pDepthStencilView);
+
 	m_pImmediateContext->ClearRenderTargetView(m_pRenderTargetView, clearColor);
 	m_pImmediateContext->ClearDepthStencilView(m_pDepthStencilView,
 		D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
-
-	m_pImmediateContext->DrawIndexed(6, 0, 0);
+	m_pImmediateContext->DrawIndexed(42, 0, 0);
 
 	m_pSwapChain->Present(0, 0);
 }

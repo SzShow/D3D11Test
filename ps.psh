@@ -2,10 +2,33 @@
 struct PS_IN
 {
 	float4 pos : SV_POSITION;
-	float4 col : COLOR0;
+	float4 posw : POSITION0;
+	float4 norw : NORMAL0;
+};
+
+cbuffer ConstantBuffer
+{
+	float4x4 World;
+	float4x4 View;
+	float4x4 Projection;
+	float4 Light;
+	float4 Attenuation;
 };
 
 float4 ps_main(PS_IN input) : SV_Target
 {
-	return input.col;
+	float3 dir;
+	float len;
+	float colD;
+	float colA;
+	float col;
+
+	dir = Light.xyz - input.posw.xyz;
+	len = length(dir);
+	dir = dir / len;
+	colD = saturate(dot(normalize(input.norw.xyz), dir));
+	colA = saturate(1.0f / (Attenuation.x + Attenuation.y * len + Attenuation.z * len * len));
+
+	col = colD * colA;
+	return float4(col, col, col, 1.0f);
 }

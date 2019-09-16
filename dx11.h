@@ -15,6 +15,7 @@ public:
 	ID3D11VertexShader* m_pVertexShader;
 	ID3D11PixelShader* m_pPixelShader;
 	ID3D11Buffer* m_pIndexBuffer;
+	ID3D11Buffer* m_pConstantBuffer;
 
 public:
 	CD3D11();

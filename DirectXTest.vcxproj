@@ -83,6 +83,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
+      <ShowIncludes>true</ShowIncludes>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -118,6 +119,7 @@ fxc.exe /T ps_5_0 /E ps_main /Fh ps_test.h ps.psh</Command>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
+      <ShowIncludes>true</ShowIncludes>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -154,13 +156,11 @@ fxc.exe /T ps_5_0 /E ps_main /Fh ps_test.h ps.psh</Command>
   <ItemGroup>
     <ClInclude Include="dx11.h" />
     <ClInclude Include="ps_test.h" />
-    <ClInclude Include="vertexHeader.h" />
     <ClInclude Include="vs_test.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dx11.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="vertexHeader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="ps.psh">
